@@ -1,0 +1,530 @@
+{% doc %}
+  @prompt
+    a clone of the variant picker except to the far right of the label that says "size" there is a clickable link named "size guide' which opens a pop up to a specific page.
+
+{% enddoc %}
+{% assign ai_gen_id = block.id | replace: '_', '' | downcase %}
+
+{% style %}
+  .ai-variant-picker-{{ ai_gen_id }} {
+    margin-bottom: 20px;
+  }
+
+  .ai-variant-picker__label-container-{{ ai_gen_id }} {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+
+  .ai-variant-picker__label-{{ ai_gen_id }} {
+    font-weight: 500;
+    margin: 0;
+  }
+
+  .ai-variant-picker__size-guide-{{ ai_gen_id }} {
+    font-size: 14px;
+    text-decoration: underline;
+    cursor: pointer;
+    color: {{ block.settings.size_guide_color }};
+  }
+
+  .ai-variant-picker__size-guide-{{ ai_gen_id }}:hover {
+    color: {{ block.settings.size_guide_hover_color }};
+  }
+
+  .ai-variant-picker__options-{{ ai_gen_id }} {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .ai-variant-picker__option-{{ ai_gen_id }} {
+    position: relative;
+  }
+
+  .ai-variant-picker__radio-{{ ai_gen_id }} {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .ai-variant-picker__button-{{ ai_gen_id }} {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: {{ block.settings.button_min_width }}px;
+    min-height: {{ block.settings.button_min_height }}px;
+    padding: 8px 16px;
+    border: {{ block.settings.variant_button_border_width }}px solid var(--variant-border-color, {{ block.settings.variant_border_color }});
+    border-radius: {{ block.settings.variant_button_radius }}px;
+    background-color: var(--variant-background-color, {{ block.settings.variant_background_color }});
+    color: var(--variant-text-color, {{ block.settings.variant_text_color }});
+    cursor: pointer;
+    transition: all 0.3s ease;
+  }
+
+  .ai-variant-picker__button-{{ ai_gen_id }}:hover {
+    --variant-background-color: {{ block.settings.variant_hover_background_color }};
+    --variant-text-color: {{ block.settings.variant_hover_text_color }};
+    --variant-border-color: {{ block.settings.variant_hover_border_color }};
+  }
+
+  .ai-variant-picker__radio-{{ ai_gen_id }}:checked + .ai-variant-picker__button-{{ ai_gen_id }} {
+    --variant-background-color: {{ block.settings.selected_variant_background_color }};
+    --variant-text-color: {{ block.settings.selected_variant_text_color }};
+    --variant-border-color: {{ block.settings.selected_variant_border_color }};
+  }
+
+  .ai-variant-picker__radio-{{ ai_gen_id }}:checked + .ai-variant-picker__button-{{ ai_gen_id }}:hover {
+    --variant-background-color: {{ block.settings.selected_variant_hover_background_color }};
+    --variant-text-color: {{ block.settings.selected_variant_hover_text_color }};
+    --variant-border-color: {{ block.settings.selected_variant_hover_border_color }};
+  }
+
+  .ai-variant-picker__radio-{{ ai_gen_id }}:focus-visible + .ai-variant-picker__button-{{ ai_gen_id }} {
+    outline: 2px solid {{ block.settings.focus_ring_color }};
+    outline-offset: 2px;
+  }
+
+  .ai-variant-picker__radio-{{ ai_gen_id }}[disabled] + .ai-variant-picker__button-{{ ai_gen_id }} {
+    opacity: 0.5;
+    cursor: not-allowed;
+    text-decoration: line-through;
+  }
+
+  .ai-size-guide-modal-{{ ai_gen_id }} {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1000;
+    background-color: rgba(0, 0, 0, 0.5);
+    align-items: center;
+    justify-content: center;
+  }
+
+  .ai-size-guide-modal-{{ ai_gen_id }}.active {
+    display: flex;
+  }
+
+  .ai-size-guide-content-{{ ai_gen_id }} {
+    position: relative;
+    background-color: white;
+    padding: 30px;
+    border-radius: 8px;
+    max-width: 90%;
+    max-height: 90%;
+    overflow-y: auto;
+    width: {{ block.settings.modal_width }}px;
+  }
+
+  .ai-size-guide-close-{{ ai_gen_id }} {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .ai-size-guide-iframe-{{ ai_gen_id }} {
+    width: 100%;
+    height: {{ block.settings.modal_height }}px;
+    border: none;
+  }
+{% endstyle %}
+
+<variant-picker-{{ ai_gen_id }} class="ai-variant-picker-{{ ai_gen_id }}" {{ block.shopify_attributes }}>
+  <div class="ai-variant-picker__label-container-{{ ai_gen_id }}">
+    <h3 class="ai-variant-picker__label-{{ ai_gen_id }}">{{ block.settings.option_name }}</h3>
+    <button 
+      type="button" 
+      class="ai-variant-picker__size-guide-{{ ai_gen_id }}" 
+      aria-label="Open size guide"
+      data-size-guide-toggle
+    >
+      {{ block.settings.size_guide_text }}
+    </button>
+  </div>
+
+  <div class="ai-variant-picker__options-{{ ai_gen_id }}">
+    {% assign option_position = 0 %}
+    
+    {% for option in product.options_with_values %}
+      {% if option.name == block.settings.option_name %}
+        {% assign option_position = forloop.index0 %}
+        {% assign selected_value = product.selected_or_first_available_variant.options[option_position] %}
+        
+        {% for value in option.values %}
+          {% assign variant_available = false %}
+          {% assign variant_for_value = blank %}
+          
+          {% for variant in product.variants %}
+            {% if variant.options[option_position] == value %}
+              {% if variant.available %}
+                {% assign variant_available = true %}
+              {% endif %}
+              {% assign variant_for_value = variant %}
+              {% break %}
+            {% endif %}
+          {% endfor %}
+          
+          <div class="ai-variant-picker__option-{{ ai_gen_id }}">
+            <input
+              type="radio"
+              id="option-{{ option.position }}-{{ value | escape }}-{{ ai_gen_id }}"
+              name="option{{ option.position }}"
+              value="{{ value | escape }}"
+              class="ai-variant-picker__radio-{{ ai_gen_id }}"
+              {% if value == selected_value %}checked{% endif %}
+              {% unless variant_available %}disabled{% endunless %}
+              data-option-position="{{ option.position }}"
+              data-value="{{ value | escape }}"
+            >
+            <label for="option-{{ option.position }}-{{ value | escape }}-{{ ai_gen_id }}" class="ai-variant-picker__button-{{ ai_gen_id }}">
+              {{ value }}
+            </label>
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endfor %}
+  </div>
+
+  <div class="ai-size-guide-modal-{{ ai_gen_id }}" aria-modal="true" role="dialog" aria-label="Size Guide">
+    <div class="ai-size-guide-content-{{ ai_gen_id }}">
+      <button type="button" class="ai-size-guide-close-{{ ai_gen_id }}" aria-label="Close size guide">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M15 5L5 15M5 5L15 15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+      <iframe src="{{ block.settings.size_guide_page.url }}" class="ai-size-guide-iframe-{{ ai_gen_id }}" title="Size Guide"></iframe>
+    </div>
+  </div>
+</variant-picker-{{ ai_gen_id }}>
+
+<script>
+  (function() {
+    class VariantPicker{{ ai_gen_id }} extends HTMLElement {
+      constructor() {
+        super();
+        this.variantSelectors = this.querySelectorAll('.ai-variant-picker__radio-{{ ai_gen_id }}');
+        this.sizeGuideToggle = this.querySelector('[data-size-guide-toggle]');
+        this.sizeGuideModal = document.querySelector('.ai-size-guide-modal-{{ ai_gen_id }}');
+        this.sizeGuideClose = document.querySelector('.ai-size-guide-close-{{ ai_gen_id }}');
+      }
+
+      connectedCallback() {
+        this.setupEventListeners();
+      }
+
+      setupEventListeners() {
+        // Variant selection
+        this.variantSelectors.forEach(radio => {
+          radio.addEventListener('change', this.onVariantChange.bind(this));
+        });
+
+        // Size guide modal
+        if (this.sizeGuideToggle && this.sizeGuideModal) {
+          this.sizeGuideToggle.addEventListener('click', this.openSizeGuide.bind(this));
+          this.sizeGuideClose.addEventListener('click', this.closeSizeGuide.bind(this));
+          this.sizeGuideModal.addEventListener('click', (event) => {
+            if (event.target === this.sizeGuideModal) {
+              this.closeSizeGuide();
+            }
+          });
+
+          // Close on escape key
+          document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape' && this.sizeGuideModal.classList.contains('active')) {
+              this.closeSizeGuide();
+            }
+          });
+        }
+      }
+
+      onVariantChange(event) {
+        const optionPosition = parseInt(event.target.getAttribute('data-option-position')) - 1;
+        const selectedValue = event.target.getAttribute('data-value');
+        
+        // Update the URL with the selected variant
+        const url = new URL(window.location.href);
+        const params = new URLSearchParams(url.search);
+        
+        // Find the variant with the selected option
+        const variants = JSON.parse(document.getElementById('product-variants-json').textContent);
+        let selectedVariant = null;
+        
+        // Get current selected options from all variant selectors
+        const currentOptions = [];
+        const optionSelectors = document.querySelectorAll('[data-option-position]');
+        
+        optionSelectors.forEach(selector => {
+          if (selector.checked) {
+            const position = parseInt(selector.getAttribute('data-option-position')) - 1;
+            const value = selector.getAttribute('data-value');
+            currentOptions[position] = value;
+          }
+        });
+        
+        // Update the option we just changed
+        currentOptions[optionPosition] = selectedValue;
+        
+        // Find the variant that matches all selected options
+        for (const variant of variants) {
+          const variantOptions = variant.options;
+          let isMatch = true;
+          
+          for (let i = 0; i < currentOptions.length; i++) {
+            if (currentOptions[i] && variantOptions[i] !== currentOptions[i]) {
+              isMatch = false;
+              break;
+            }
+          }
+          
+          if (isMatch) {
+            selectedVariant = variant;
+            break;
+          }
+        }
+        
+        if (selectedVariant) {
+          params.set('variant', selectedVariant.id);
+          url.search = params.toString();
+          window.history.replaceState({}, '', url.toString());
+          
+          // Dispatch event for other components to react to variant change
+          const variantChangeEvent = new CustomEvent('variant:change', {
+            detail: {
+              variant: selectedVariant
+            },
+            bubbles: true
+          });
+          
+          this.dispatchEvent(variantChangeEvent);
+        }
+      }
+
+      openSizeGuide() {
+        this.sizeGuideModal.classList.add('active');
+        document.body.style.overflow = 'hidden';
+      }
+
+      closeSizeGuide() {
+        this.sizeGuideModal.classList.remove('active');
+        document.body.style.overflow = '';
+      }
+    }
+
+    customElements.define('variant-picker-{{ ai_gen_id }}', VariantPicker{{ ai_gen_id }});
+  })();
+</script>
+
+{% schema %}
+{
+  "name": "Variant Picker",
+  "tag": null,
+  "settings": [
+    {
+      "type": "header",
+      "content": "Variant Options"
+    },
+    {
+      "type": "text",
+      "id": "option_name",
+      "label": "Option name to display",
+      "default": "Size"
+    },
+    {
+      "type": "header",
+      "content": "Size Guide"
+    },
+    {
+      "type": "text",
+      "id": "size_guide_text",
+      "label": "Size guide text",
+      "default": "Size Guide"
+    },
+    {
+      "type": "page",
+      "id": "size_guide_page",
+      "label": "Size guide page"
+    },
+    {
+      "type": "range",
+      "id": "modal_width",
+      "min": 300,
+      "max": 1000,
+      "step": 50,
+      "unit": "px",
+      "label": "Modal width",
+      "default": 600
+    },
+    {
+      "type": "range",
+      "id": "modal_height",
+      "min": 300,
+      "max": 800,
+      "step": 50,
+      "unit": "px",
+      "label": "Modal height",
+      "default": 500
+    },
+    {
+      "type": "header",
+      "content": "Variant Button Styles"
+    },
+    {
+      "type": "range",
+      "id": "button_min_width",
+      "min": 30,
+      "max": 120,
+      "step": 5,
+      "unit": "px",
+      "label": "Min width",
+      "default": 50
+    },
+    {
+      "type": "range",
+      "id": "button_min_height",
+      "min": 30,
+      "max": 80,
+      "step": 5,
+      "unit": "px",
+      "label": "Min height",
+      "default": 40
+    },
+    {
+      "type": "range",
+      "id": "variant_button_border_width",
+      "min": 0,
+      "max": 4,
+      "step": 1,
+      "unit": "px",
+      "label": "Border width",
+      "default": 1
+    },
+    {
+      "type": "range",
+      "id": "variant_button_radius",
+      "min": 0,
+      "max": 40,
+      "step": 1,
+      "unit": "px",
+      "label": "Border radius",
+      "default": 8
+    },
+    {
+      "type": "header",
+      "content": "Colors"
+    },
+    {
+      "type": "color",
+      "id": "size_guide_color",
+      "label": "Size guide link color",
+      "default": "#000000"
+    },
+    {
+      "type": "color",
+      "id": "size_guide_hover_color",
+      "label": "Size guide link hover color",
+      "default": "#555555"
+    },
+    {
+      "type": "color",
+      "id": "variant_background_color",
+      "label": "Variant background color",
+      "default": "#FFFFFF"
+    },
+    {
+      "type": "color",
+      "id": "variant_text_color",
+      "label": "Variant text color",
+      "default": "#000000"
+    },
+    {
+      "type": "color",
+      "id": "variant_border_color",
+      "label": "Variant border color",
+      "default": "#E6E6E6"
+    },
+    {
+      "type": "color",
+      "id": "variant_hover_background_color",
+      "label": "Variant hover background",
+      "default": "#F5F5F5"
+    },
+    {
+      "type": "color",
+      "id": "variant_hover_text_color",
+      "label": "Variant hover text",
+      "default": "#000000"
+    },
+    {
+      "type": "color",
+      "id": "variant_hover_border_color",
+      "label": "Variant hover border",
+      "default": "#E6E6E6"
+    },
+    {
+      "type": "color",
+      "id": "selected_variant_background_color",
+      "label": "Selected variant background",
+      "default": "#000000"
+    },
+    {
+      "type": "color",
+      "id": "selected_variant_text_color",
+      "label": "Selected variant text",
+      "default": "#FFFFFF"
+    },
+    {
+      "type": "color",
+      "id": "selected_variant_border_color",
+      "label": "Selected variant border",
+      "default": "#000000"
+    },
+    {
+      "type": "color",
+      "id": "selected_variant_hover_background_color",
+      "label": "Selected variant hover background",
+      "default": "#333333"
+    },
+    {
+      "type": "color",
+      "id": "selected_variant_hover_text_color",
+      "label": "Selected variant hover text",
+      "default": "#FFFFFF"
+    },
+    {
+      "type": "color",
+      "id": "selected_variant_hover_border_color",
+      "label": "Selected variant hover border",
+      "default": "#333333"
+    },
+    {
+      "type": "color",
+      "id": "focus_ring_color",
+      "label": "Focus ring color",
+      "default": "#000F9F"
+    }
+  ],
+  "presets": [
+    {
+      "name": "Variant Picker"
+    }
+  ]
+}
+{% endschema %}
